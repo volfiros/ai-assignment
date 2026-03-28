@@ -11,6 +11,8 @@ SOLVERS = {
     "idastar": solve_idastar,
     "iddfs": solve_iddfs,
 }
+HEURISTIC_ALGORITHMS = {"astar", "idastar"}
+DEFAULT_BENCHMARK_HEURISTIC = "linear_conflict"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -22,6 +24,8 @@ def build_parser() -> argparse.ArgumentParser:
     solve_parser.add_argument("--case", choices=sorted(PRESET_CASES))
     solve_parser.add_argument("--algorithm", choices=sorted(SOLVERS))
     solve_parser.add_argument("--heuristic", choices=sorted(HEURISTICS))
+
+    subparsers.add_parser("benchmark")
 
     return parser
 
@@ -51,10 +55,7 @@ def render_report(state, source: str) -> str:
 
 
 def render_search_report(state, source: str, algorithm: str, heuristic: str = None) -> str:
-    if algorithm in {"astar", "idastar"}:
-        result = SOLVERS[algorithm](state, heuristic)
-    else:
-        result = SOLVERS[algorithm](state)
+    result = run_solver(state, algorithm, heuristic)
     moves = " ".join(result.moves) if result.moves else "(none)"
     lines = [
         f"Source: {source}",
@@ -74,9 +75,51 @@ def render_search_report(state, source: str, algorithm: str, heuristic: str = No
     return "\n".join(lines)
 
 
+def run_solver(state, algorithm: str, heuristic: str = None):
+    if algorithm in HEURISTIC_ALGORITHMS:
+        return SOLVERS[algorithm](state, heuristic)
+    return SOLVERS[algorithm](state)
+
+
+def render_benchmark_report() -> str:
+    headers = ["Case", "Algorithm", "Heuristic", "Moves", "Expanded", "Generated", "Frontier", "Elapsed"]
+    rows = [headers]
+
+    for case_name, state in PRESET_CASES.items():
+        for algorithm in ["bfs", "iddfs", "astar", "idastar"]:
+            heuristic = DEFAULT_BENCHMARK_HEURISTIC if algorithm in HEURISTIC_ALGORITHMS else "-"
+            result = run_solver(
+                state,
+                algorithm,
+                None if heuristic == "-" else heuristic,
+            )
+            rows.append(
+                [
+                    case_name,
+                    result.algorithm,
+                    result.heuristic or "-",
+                    str(len(result.moves)),
+                    str(result.nodes_expanded),
+                    str(result.nodes_generated),
+                    str(result.max_frontier),
+                    str(result.elapsed_ms),
+                ]
+            )
+
+    widths = [max(len(row[index]) for row in rows) for index in range(len(headers))]
+    return "\n".join(
+        "  ".join(cell.ljust(widths[index]) for index, cell in enumerate(row))
+        for row in rows
+    )
+
+
 def main(argv=None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if args.command == "benchmark":
+        print(render_benchmark_report())
+        return 0
 
     if args.command != "solve":
         parser.error("unsupported command")
@@ -88,7 +131,7 @@ def main(argv=None) -> int:
         return 2
 
     if args.algorithm:
-        if args.algorithm in {"astar", "idastar"} and not args.heuristic:
+        if args.algorithm in HEURISTIC_ALGORITHMS and not args.heuristic:
             print(f"Error: --heuristic is required for {args.algorithm}", file=sys.stderr)
             return 2
         print(render_search_report(state, source, args.algorithm, args.heuristic))

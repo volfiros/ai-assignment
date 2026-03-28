@@ -94,5 +94,20 @@ class UnsolvableTests(unittest.TestCase):
             self.assertEqual(result.max_frontier, 0)
 
 
+class IntegrationTests(unittest.TestCase):
+    def test_all_algorithms_agree_on_medium_solution_length(self):
+        state = (1, 2, 3, 5, 0, 6, 4, 7, 8)
+
+        results = [
+            solve_bfs(state),
+            solve_iddfs(state),
+            solve_astar(state, "linear_conflict"),
+            solve_idastar(state, "linear_conflict"),
+        ]
+
+        lengths = {len(result.moves) for result in results}
+        self.assertEqual(lengths, {4})
+
+
 if __name__ == "__main__":
     unittest.main()

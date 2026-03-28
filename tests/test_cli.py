@@ -162,6 +162,27 @@ class CliTests(unittest.TestCase):
         self.assertIn("Solved: no", result.stdout)
         self.assertIn("Nodes expanded: 0", result.stdout)
 
+    def test_benchmark_command_prints_all_algorithms(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "npuzzle.cli",
+                "benchmark",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Case", result.stdout)
+        self.assertIn("Algorithm", result.stdout)
+        self.assertIn("bfs", result.stdout)
+        self.assertIn("iddfs", result.stdout)
+        self.assertIn("astar", result.stdout)
+        self.assertIn("idastar", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
