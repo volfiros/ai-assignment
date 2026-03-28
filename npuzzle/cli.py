@@ -3,9 +3,10 @@ import sys
 
 from .core import format_state, get_neighbors, is_goal, is_solvable, parse_state
 from .presets import PRESET_CASES
-from .search import solve_bfs, solve_iddfs
+from .search import HEURISTICS, solve_astar, solve_bfs, solve_iddfs
 
 SOLVERS = {
+    "astar": solve_astar,
     "bfs": solve_bfs,
     "iddfs": solve_iddfs,
 }
@@ -19,6 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     solve_parser.add_argument("--state")
     solve_parser.add_argument("--case", choices=sorted(PRESET_CASES))
     solve_parser.add_argument("--algorithm", choices=sorted(SOLVERS))
+    solve_parser.add_argument("--heuristic", choices=sorted(HEURISTICS))
 
     return parser
 
@@ -47,24 +49,28 @@ def render_report(state, source: str) -> str:
     )
 
 
-def render_search_report(state, source: str, algorithm: str) -> str:
-    result = SOLVERS[algorithm](state)
+def render_search_report(state, source: str, algorithm: str, heuristic: str = None) -> str:
+    if algorithm == "astar":
+        result = SOLVERS[algorithm](state, heuristic)
+    else:
+        result = SOLVERS[algorithm](state)
     moves = " ".join(result.moves) if result.moves else "(none)"
-    return "\n".join(
-        [
-            f"Source: {source}",
-            f"Algorithm: {result.algorithm}",
-            "Board:",
-            format_state(state),
-            f"Solved: {'yes' if result.solved else 'no'}",
-            f"Move count: {len(result.moves)}",
-            f"Moves: {moves}",
-            f"Nodes expanded: {result.nodes_expanded}",
-            f"Nodes generated: {result.nodes_generated}",
-            f"Max frontier: {result.max_frontier}",
-            f"Elapsed ms: {result.elapsed_ms}",
-        ]
-    )
+    lines = [
+        f"Source: {source}",
+        f"Algorithm: {result.algorithm}",
+        "Board:",
+        format_state(state),
+        f"Solved: {'yes' if result.solved else 'no'}",
+        f"Move count: {len(result.moves)}",
+        f"Moves: {moves}",
+        f"Nodes expanded: {result.nodes_expanded}",
+        f"Nodes generated: {result.nodes_generated}",
+        f"Max frontier: {result.max_frontier}",
+        f"Elapsed ms: {result.elapsed_ms}",
+    ]
+    if result.heuristic:
+        lines.insert(2, f"Heuristic: {result.heuristic}")
+    return "\n".join(lines)
 
 
 def main(argv=None) -> int:
@@ -81,7 +87,10 @@ def main(argv=None) -> int:
         return 2
 
     if args.algorithm:
-        print(render_search_report(state, source, args.algorithm))
+        if args.algorithm == "astar" and not args.heuristic:
+            print("Error: --heuristic is required for astar", file=sys.stderr)
+            return 2
+        print(render_search_report(state, source, args.algorithm, args.heuristic))
         return 0
 
     print(render_report(state, source))

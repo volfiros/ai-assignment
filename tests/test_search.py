@@ -1,7 +1,7 @@
 import unittest
 
 from npuzzle.core import GOAL_STATE
-from npuzzle.search import SearchResult, solve_bfs, solve_iddfs
+from npuzzle.search import SearchResult, solve_astar, solve_bfs, solve_iddfs
 
 
 class BfsTests(unittest.TestCase):
@@ -35,6 +35,31 @@ class IddfsTests(unittest.TestCase):
         self.assertTrue(result.solved)
         self.assertEqual(result.path, [GOAL_STATE])
         self.assertEqual(result.moves, [])
+
+
+class AStarTests(unittest.TestCase):
+    def test_astar_matches_bfs_solution_length_on_medium_board(self):
+        state = (1, 2, 3, 5, 0, 6, 4, 7, 8)
+        bfs_result = solve_bfs(state)
+        astar_result = solve_astar(state, "manhattan")
+
+        self.assertTrue(astar_result.solved)
+        self.assertEqual(len(astar_result.moves), len(bfs_result.moves))
+        self.assertEqual(astar_result.algorithm, "astar")
+        self.assertEqual(astar_result.heuristic, "manhattan")
+
+    def test_linear_conflict_expands_no_more_nodes_than_manhattan(self):
+        state = (2, 1, 3, 4, 5, 6, 8, 7, 0)
+        manhattan_result = solve_astar(state, "manhattan")
+        linear_conflict_result = solve_astar(state, "linear_conflict")
+
+        self.assertTrue(manhattan_result.solved)
+        self.assertTrue(linear_conflict_result.solved)
+        self.assertLessEqual(
+            linear_conflict_result.nodes_expanded,
+            manhattan_result.nodes_expanded,
+        )
+        self.assertEqual(linear_conflict_result.heuristic, "linear_conflict")
 
 
 if __name__ == "__main__":

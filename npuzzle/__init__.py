@@ -1,6 +1,6 @@
 from .core import GOAL_STATE, PuzzleState
 from .heuristics import linear_conflict, manhattan_distance
-from .search import SearchResult, solve_bfs, solve_iddfs
+from .search import SearchResult, solve_astar, solve_bfs, solve_iddfs
 
 __all__ = [
     "GOAL_STATE",
@@ -8,6 +8,7 @@ __all__ = [
     "SearchResult",
     "linear_conflict",
     "manhattan_distance",
+    "solve_astar",
     "solve_bfs",
     "solve_iddfs",
 ]

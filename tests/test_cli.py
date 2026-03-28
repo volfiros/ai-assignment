@@ -67,6 +67,54 @@ class CliTests(unittest.TestCase):
         self.assertIn("Solved: yes", result.stdout)
         self.assertIn("Move count: 1", result.stdout)
 
+    def test_solve_command_runs_astar_with_manhattan(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "npuzzle.cli",
+                "solve",
+                "--algorithm",
+                "astar",
+                "--heuristic",
+                "manhattan",
+                "--case",
+                "medium",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Algorithm: astar", result.stdout)
+        self.assertIn("Heuristic: manhattan", result.stdout)
+        self.assertIn("Solved: yes", result.stdout)
+
+    def test_solve_command_runs_astar_with_linear_conflict(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "npuzzle.cli",
+                "solve",
+                "--algorithm",
+                "astar",
+                "--heuristic",
+                "linear_conflict",
+                "--case",
+                "medium",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Algorithm: astar", result.stdout)
+        self.assertIn("Heuristic: linear_conflict", result.stdout)
+        self.assertIn("Solved: yes", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

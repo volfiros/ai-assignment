@@ -1,9 +1,11 @@
-import time
 from collections import deque
 from dataclasses import dataclass
+import heapq
+import time
 from typing import Dict, List, Optional, Set, Tuple
 
 from .core import GOAL_STATE, PuzzleState, get_neighbors, is_goal
+from .heuristics import linear_conflict, manhattan_distance
 
 
 @dataclass
@@ -20,6 +22,10 @@ class SearchResult:
 
 
 ParentMap = Dict[PuzzleState, Tuple[Optional[PuzzleState], Optional[str]]]
+HEURISTICS = {
+    "manhattan": manhattan_distance,
+    "linear_conflict": linear_conflict,
+}
 
 
 def solve_bfs(initial_state: PuzzleState) -> SearchResult:
@@ -114,6 +120,70 @@ def solve_iddfs(initial_state: PuzzleState) -> SearchResult:
         elapsed_ms=_elapsed_ms(started_at),
         algorithm="iddfs",
         heuristic=None,
+    )
+
+
+def solve_astar(initial_state: PuzzleState, heuristic_name: str) -> SearchResult:
+    started_at = time.perf_counter()
+    heuristic = HEURISTICS[heuristic_name]
+    frontier = []
+    parents: ParentMap = {initial_state: (None, None)}
+    g_scores = {initial_state: 0}
+    best_expanded = set()
+    nodes_expanded = 0
+    nodes_generated = 1
+    max_frontier = 1
+    sequence = 0
+
+    heapq.heappush(frontier, (heuristic(initial_state), sequence, initial_state))
+
+    while frontier:
+        _, _, state = heapq.heappop(frontier)
+        if state in best_expanded:
+            continue
+
+        best_expanded.add(state)
+        nodes_expanded += 1
+
+        if is_goal(state):
+            path, moves = _build_path(parents, state)
+            return SearchResult(
+                solved=True,
+                path=path,
+                moves=moves,
+                nodes_expanded=nodes_expanded,
+                nodes_generated=nodes_generated,
+                max_frontier=max_frontier,
+                elapsed_ms=_elapsed_ms(started_at),
+                algorithm="astar",
+                heuristic=heuristic_name,
+            )
+
+        current_cost = g_scores[state]
+
+        for move, neighbor in get_neighbors(state):
+            tentative_cost = current_cost + 1
+            if tentative_cost >= g_scores.get(neighbor, float("inf")):
+                continue
+            parents[neighbor] = (state, move)
+            g_scores[neighbor] = tentative_cost
+            sequence += 1
+            priority = tentative_cost + heuristic(neighbor)
+            heapq.heappush(frontier, (priority, sequence, neighbor))
+            nodes_generated += 1
+
+        max_frontier = max(max_frontier, len(frontier))
+
+    return SearchResult(
+        solved=False,
+        path=[],
+        moves=[],
+        nodes_expanded=nodes_expanded,
+        nodes_generated=nodes_generated,
+        max_frontier=max_frontier,
+        elapsed_ms=_elapsed_ms(started_at),
+        algorithm="astar",
+        heuristic=heuristic_name,
     )
 
 
