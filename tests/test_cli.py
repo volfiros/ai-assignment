@@ -115,6 +115,53 @@ class CliTests(unittest.TestCase):
         self.assertIn("Heuristic: linear_conflict", result.stdout)
         self.assertIn("Solved: yes", result.stdout)
 
+    def test_solve_command_runs_idastar_with_linear_conflict(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "npuzzle.cli",
+                "solve",
+                "--algorithm",
+                "idastar",
+                "--heuristic",
+                "linear_conflict",
+                "--case",
+                "medium",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Algorithm: idastar", result.stdout)
+        self.assertIn("Heuristic: linear_conflict", result.stdout)
+        self.assertIn("Solved: yes", result.stdout)
+
+    def test_solve_command_reports_unsolvable_state_without_search(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "npuzzle.cli",
+                "solve",
+                "--algorithm",
+                "idastar",
+                "--heuristic",
+                "linear_conflict",
+                "--state",
+                "1 2 3 4 5 6 8 7 0",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Solved: no", result.stdout)
+        self.assertIn("Nodes expanded: 0", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

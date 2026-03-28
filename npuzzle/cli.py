@@ -3,11 +3,12 @@ import sys
 
 from .core import format_state, get_neighbors, is_goal, is_solvable, parse_state
 from .presets import PRESET_CASES
-from .search import HEURISTICS, solve_astar, solve_bfs, solve_iddfs
+from .search import HEURISTICS, solve_astar, solve_bfs, solve_idastar, solve_iddfs
 
 SOLVERS = {
     "astar": solve_astar,
     "bfs": solve_bfs,
+    "idastar": solve_idastar,
     "iddfs": solve_iddfs,
 }
 
@@ -50,7 +51,7 @@ def render_report(state, source: str) -> str:
 
 
 def render_search_report(state, source: str, algorithm: str, heuristic: str = None) -> str:
-    if algorithm == "astar":
+    if algorithm in {"astar", "idastar"}:
         result = SOLVERS[algorithm](state, heuristic)
     else:
         result = SOLVERS[algorithm](state)
@@ -87,8 +88,8 @@ def main(argv=None) -> int:
         return 2
 
     if args.algorithm:
-        if args.algorithm == "astar" and not args.heuristic:
-            print("Error: --heuristic is required for astar", file=sys.stderr)
+        if args.algorithm in {"astar", "idastar"} and not args.heuristic:
+            print(f"Error: --heuristic is required for {args.algorithm}", file=sys.stderr)
             return 2
         print(render_search_report(state, source, args.algorithm, args.heuristic))
         return 0

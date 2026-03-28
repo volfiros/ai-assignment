@@ -4,7 +4,7 @@ import heapq
 import time
 from typing import Dict, List, Optional, Set, Tuple
 
-from .core import GOAL_STATE, PuzzleState, get_neighbors, is_goal
+from .core import GOAL_STATE, PuzzleState, get_neighbors, is_goal, is_solvable
 from .heuristics import linear_conflict, manhattan_distance
 
 
@@ -30,6 +30,8 @@ HEURISTICS = {
 
 def solve_bfs(initial_state: PuzzleState) -> SearchResult:
     started_at = time.perf_counter()
+    if not is_solvable(initial_state):
+        return _unsolved_result("bfs", started_at)
     frontier = deque([initial_state])
     parents: ParentMap = {initial_state: (None, None)}
     visited = {initial_state}
@@ -80,6 +82,8 @@ def solve_bfs(initial_state: PuzzleState) -> SearchResult:
 
 def solve_iddfs(initial_state: PuzzleState) -> SearchResult:
     started_at = time.perf_counter()
+    if not is_solvable(initial_state):
+        return _unsolved_result("iddfs", started_at)
     depth_limit = 0
     nodes_expanded = 0
     nodes_generated = 1
@@ -125,6 +129,8 @@ def solve_iddfs(initial_state: PuzzleState) -> SearchResult:
 
 def solve_astar(initial_state: PuzzleState, heuristic_name: str) -> SearchResult:
     started_at = time.perf_counter()
+    if not is_solvable(initial_state):
+        return _unsolved_result("astar", started_at, heuristic_name)
     heuristic = HEURISTICS[heuristic_name]
     frontier = []
     parents: ParentMap = {initial_state: (None, None)}
@@ -187,6 +193,55 @@ def solve_astar(initial_state: PuzzleState, heuristic_name: str) -> SearchResult
     )
 
 
+def solve_idastar(initial_state: PuzzleState, heuristic_name: str) -> SearchResult:
+    started_at = time.perf_counter()
+    if not is_solvable(initial_state):
+        return _unsolved_result("idastar", started_at, heuristic_name)
+
+    heuristic = HEURISTICS[heuristic_name]
+    threshold = heuristic(initial_state)
+    nodes_expanded = 0
+    nodes_generated = 1
+    max_frontier = 1
+
+    while True:
+        found, next_threshold, path, moves, expanded, generated, frontier = _ida_search(
+            initial_state,
+            0,
+            threshold,
+            heuristic,
+            {initial_state},
+        )
+        nodes_expanded += expanded
+        nodes_generated += generated
+        max_frontier = max(max_frontier, frontier)
+
+        if found:
+            return SearchResult(
+                solved=True,
+                path=path,
+                moves=moves,
+                nodes_expanded=nodes_expanded,
+                nodes_generated=nodes_generated,
+                max_frontier=max_frontier,
+                elapsed_ms=_elapsed_ms(started_at),
+                algorithm="idastar",
+                heuristic=heuristic_name,
+            )
+
+        if next_threshold == float("inf"):
+            return _unsolved_result(
+                "idastar",
+                started_at,
+                heuristic_name,
+                nodes_expanded,
+                nodes_generated,
+                max_frontier,
+            )
+
+        threshold = next_threshold
+
+
 def _depth_limited_search(
     state: PuzzleState,
     depth_limit: int,
@@ -229,6 +284,59 @@ def _depth_limited_search(
     return False, [], [], nodes_expanded, nodes_generated, max_frontier
 
 
+def _ida_search(
+    state: PuzzleState,
+    cost: int,
+    threshold: int,
+    heuristic,
+    path_states: Set[PuzzleState],
+):
+    estimate = cost + heuristic(state)
+    nodes_expanded = 1
+    nodes_generated = 0
+    max_frontier = len(path_states)
+
+    if estimate > threshold:
+        return False, estimate, [], [], nodes_expanded, nodes_generated, max_frontier
+
+    if is_goal(state):
+        return True, threshold, [state], [], nodes_expanded, nodes_generated, max_frontier
+
+    minimum = float("inf")
+
+    for move, neighbor in get_neighbors(state):
+        if neighbor in path_states:
+            continue
+        next_path_states = set(path_states)
+        next_path_states.add(neighbor)
+        nodes_generated += 1
+        found, candidate, path, moves, expanded, generated, frontier = _ida_search(
+            neighbor,
+            cost + 1,
+            threshold,
+            heuristic,
+            next_path_states,
+        )
+        nodes_expanded += expanded
+        nodes_generated += generated
+        max_frontier = max(max_frontier, frontier)
+
+        if found:
+            return (
+                True,
+                candidate,
+                [state] + path,
+                [move] + moves,
+                nodes_expanded,
+                nodes_generated,
+                max_frontier,
+            )
+
+        minimum = min(minimum, candidate)
+
+    return False, minimum, [], [], nodes_expanded, nodes_generated, max_frontier
+
+
 def _build_path(parents: ParentMap, goal_state: PuzzleState):
     path = []
     moves = []
@@ -248,3 +356,24 @@ def _build_path(parents: ParentMap, goal_state: PuzzleState):
 
 def _elapsed_ms(started_at: float) -> int:
     return int((time.perf_counter() - started_at) * 1000)
+
+
+def _unsolved_result(
+    algorithm: str,
+    started_at: float,
+    heuristic: Optional[str] = None,
+    nodes_expanded: int = 0,
+    nodes_generated: int = 0,
+    max_frontier: int = 0,
+) -> SearchResult:
+    return SearchResult(
+        solved=False,
+        path=[],
+        moves=[],
+        nodes_expanded=nodes_expanded,
+        nodes_generated=nodes_generated,
+        max_frontier=max_frontier,
+        elapsed_ms=_elapsed_ms(started_at),
+        algorithm=algorithm,
+        heuristic=heuristic,
+    )
