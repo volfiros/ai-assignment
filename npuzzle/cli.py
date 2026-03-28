@@ -3,6 +3,12 @@ import sys
 
 from .core import format_state, get_neighbors, is_goal, is_solvable, parse_state
 from .presets import PRESET_CASES
+from .search import solve_bfs, solve_iddfs
+
+SOLVERS = {
+    "bfs": solve_bfs,
+    "iddfs": solve_iddfs,
+}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -12,6 +18,7 @@ def build_parser() -> argparse.ArgumentParser:
     solve_parser = subparsers.add_parser("solve")
     solve_parser.add_argument("--state")
     solve_parser.add_argument("--case", choices=sorted(PRESET_CASES))
+    solve_parser.add_argument("--algorithm", choices=sorted(SOLVERS))
 
     return parser
 
@@ -40,6 +47,26 @@ def render_report(state, source: str) -> str:
     )
 
 
+def render_search_report(state, source: str, algorithm: str) -> str:
+    result = SOLVERS[algorithm](state)
+    moves = " ".join(result.moves) if result.moves else "(none)"
+    return "\n".join(
+        [
+            f"Source: {source}",
+            f"Algorithm: {result.algorithm}",
+            "Board:",
+            format_state(state),
+            f"Solved: {'yes' if result.solved else 'no'}",
+            f"Move count: {len(result.moves)}",
+            f"Moves: {moves}",
+            f"Nodes expanded: {result.nodes_expanded}",
+            f"Nodes generated: {result.nodes_generated}",
+            f"Max frontier: {result.max_frontier}",
+            f"Elapsed ms: {result.elapsed_ms}",
+        ]
+    )
+
+
 def main(argv=None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -52,6 +79,10 @@ def main(argv=None) -> int:
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
+
+    if args.algorithm:
+        print(render_search_report(state, source, args.algorithm))
+        return 0
 
     print(render_report(state, source))
     return 0

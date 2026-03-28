@@ -23,6 +23,50 @@ class CliTests(unittest.TestCase):
         self.assertIn("State is solvable: yes", result.stdout)
         self.assertIn("Goal reached: yes", result.stdout)
 
+    def test_solve_command_runs_bfs_for_easy_case(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "npuzzle.cli",
+                "solve",
+                "--algorithm",
+                "bfs",
+                "--case",
+                "easy",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Algorithm: bfs", result.stdout)
+        self.assertIn("Solved: yes", result.stdout)
+        self.assertIn("Move count: 1", result.stdout)
+
+    def test_solve_command_runs_iddfs_for_easy_case(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "npuzzle.cli",
+                "solve",
+                "--algorithm",
+                "iddfs",
+                "--case",
+                "easy",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Algorithm: iddfs", result.stdout)
+        self.assertIn("Solved: yes", result.stdout)
+        self.assertIn("Move count: 1", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

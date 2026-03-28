@@ -1,4 +1,13 @@
 from .core import GOAL_STATE, PuzzleState
 from .heuristics import linear_conflict, manhattan_distance
+from .search import SearchResult, solve_bfs, solve_iddfs
 
-__all__ = ["GOAL_STATE", "PuzzleState", "linear_conflict", "manhattan_distance"]
+__all__ = [
+    "GOAL_STATE",
+    "PuzzleState",
+    "SearchResult",
+    "linear_conflict",
+    "manhattan_distance",
+    "solve_bfs",
+    "solve_iddfs",
+]
