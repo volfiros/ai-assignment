@@ -7,12 +7,75 @@ from .core import format_state, parse_state
 from .presets import PRESET_CASES
 from .search import SearchResult, solve_astar, solve_bfs, solve_idastar, solve_iddfs
 
+BUTTON_DARK_BG = "#30271e"
+BUTTON_DARK_FG = "#f8f4ed"
+BUTTON_DARK_ACTIVE_BG = "#46392c"
+PLAYBACK_SPEED_DEFAULT = 600
+ALGORITHM_LABELS = {
+    "astar": "A*",
+    "bfs": "BFS",
+    "idastar": "IDA*",
+    "iddfs": "IDDFS",
+}
+HEURISTIC_LABELS = {
+    "linear_conflict": "Linear Conflict",
+    "manhattan": "Manhattan",
+}
+
 SOLVERS = {
     "astar": solve_astar,
     "bfs": solve_bfs,
     "idastar": solve_idastar,
     "iddfs": solve_iddfs,
 }
+
+
+class ActionButton(tk.Label):
+    def __init__(
+        self,
+        master,
+        text: str,
+        command,
+        bg: str = BUTTON_DARK_BG,
+        fg: str = BUTTON_DARK_FG,
+        active_bg: str = BUTTON_DARK_ACTIVE_BG,
+        padx: int = 10,
+        pady: int = 8,
+        font=("Helvetica", 11, "bold"),
+    ):
+        super().__init__(
+            master,
+            text=text,
+            bg=bg,
+            fg=fg,
+            padx=padx,
+            pady=pady,
+            font=font,
+            relief="flat",
+            cursor="hand2",
+            anchor="center",
+            takefocus=1,
+        )
+        self.command = command
+        self.default_bg = bg
+        self.active_bg = active_bg
+
+        self.bind("<Button-1>", self._on_click)
+        self.bind("<Return>", self._on_click)
+        self.bind("<space>", self._on_click)
+        self.bind("<Enter>", self._on_enter)
+        self.bind("<Leave>", self._on_leave)
+        self.bind("<FocusIn>", self._on_enter)
+        self.bind("<FocusOut>", self._on_leave)
+
+    def _on_click(self, _event=None):
+        self.command()
+
+    def _on_enter(self, _event=None):
+        self.configure(bg=self.active_bg)
+
+    def _on_leave(self, _event=None):
+        self.configure(bg=self.default_bg)
 
 
 class PuzzleController:
@@ -89,8 +152,8 @@ class PuzzleController:
 
     def run_text(self) -> str:
         if self.algorithm in {"astar", "idastar"}:
-            return f"{self.algorithm} • {self.heuristic}"
-        return self.algorithm
+            return f"{display_algorithm(self.algorithm)} • {display_heuristic(self.heuristic)}"
+        return display_algorithm(self.algorithm)
 
     def metrics(self):
         if self.result is None:
@@ -124,24 +187,21 @@ class PuzzleApp:
         self.root.minsize(960, 620)
         self.root.configure(bg="#f3efe7")
 
-        self.style = ttk.Style()
-        self.style.theme_use("clam")
-        self.style.configure("App.TFrame", background="#f3efe7")
-        self.style.configure("Panel.TFrame", background="#fcfaf6")
-        self.style.configure("Rail.TFrame", background="#ebe4d7")
-        self.style.configure("App.TLabel", background="#fcfaf6", foreground="#201b16")
-        self.style.configure("Rail.TLabel", background="#ebe4d7", foreground="#201b16")
-        self.style.configure("Section.TLabel", background="#ebe4d7", foreground="#201b16", font=("Helvetica", 12, "bold"))
-        self.style.configure("PanelTitle.TLabel", background="#fcfaf6", foreground="#201b16", font=("Helvetica", 14, "bold"))
-        self.style.configure("Meta.TLabel", background="#fcfaf6", foreground="#5a5146", font=("Helvetica", 11))
-        self.style.configure("App.TCombobox", padding=6)
-        self.style.configure("App.TEntry", padding=6)
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("App.TFrame", background="#f3efe7")
+        style.configure("Rail.TFrame", background="#ebe4d7")
+        style.configure("Rail.TLabel", background="#ebe4d7", foreground="#201b16")
+        style.configure("Section.TLabel", background="#ebe4d7", foreground="#201b16", font=("Helvetica", 12, "bold"))
+        style.configure("Meta.TLabel", background="#fcfaf6", foreground="#5a5146", font=("Helvetica", 11))
+        style.configure("App.TCombobox", padding=6)
+        style.configure("App.TEntry", padding=6)
 
         self.case_var = tk.StringVar(value=self.controller.selected_case)
-        self.algorithm_var = tk.StringVar(value=self.controller.algorithm)
-        self.heuristic_var = tk.StringVar(value=self.controller.heuristic)
+        self.algorithm_var = tk.StringVar(value=display_algorithm(self.controller.algorithm))
+        self.heuristic_var = tk.StringVar(value=display_heuristic(self.controller.heuristic))
         self.custom_state_var = tk.StringVar(value="")
-        self.speed_var = tk.IntVar(value=350)
+        self.speed_var = tk.IntVar(value=PLAYBACK_SPEED_DEFAULT)
         self.step_var = tk.StringVar(value=self.controller.step_label())
         self.source_var = tk.StringVar(value=self.controller.source_text())
         self.run_var = tk.StringVar(value=self.controller.run_text())
@@ -210,7 +270,7 @@ class PuzzleApp:
         algorithm_box = ttk.Combobox(
             rail,
             textvariable=self.algorithm_var,
-            values=["astar", "idastar", "bfs", "iddfs"],
+            values=[display_algorithm(name) for name in ["astar", "idastar", "bfs", "iddfs"]],
             state="readonly",
             style="App.TCombobox",
         )
@@ -221,7 +281,7 @@ class PuzzleApp:
         heuristic_box = ttk.Combobox(
             rail,
             textvariable=self.heuristic_var,
-            values=["linear_conflict", "manhattan"],
+            values=[display_heuristic(name) for name in ["linear_conflict", "manhattan"]],
             state="readonly",
             style="App.TCombobox",
         )
@@ -232,7 +292,14 @@ class PuzzleApp:
         custom_entry = ttk.Entry(rail, textvariable=self.custom_state_var, style="App.TEntry")
         custom_entry.pack(fill="x")
 
-        ttk.Button(rail, text="Load custom", command=self.on_custom_state).pack(fill="x", pady=(8, 0))
+        ActionButton(
+            rail,
+            text="Load custom",
+            command=self.on_custom_state,
+            bg=BUTTON_DARK_BG,
+            fg=BUTTON_DARK_FG,
+            active_bg=BUTTON_DARK_ACTIVE_BG,
+        ).pack(fill="x", pady=(8, 0))
 
         ttk.Label(rail, text="Playback speed (ms)", style="Rail.TLabel").pack(anchor="w", pady=(18, 4))
         speed = ttk.Scale(
@@ -248,18 +315,22 @@ class PuzzleApp:
         rail_buttons.pack(fill="x", pady=(18, 0))
         rail_buttons.columnconfigure((0, 1), weight=1)
 
-        for column, (label, command, dark) in enumerate(
+        for column, (label, command) in enumerate(
             [
-                ("Solve", self.on_solve, True),
-                ("Reset", self.on_reset, True),
+                ("Solve", self.on_solve),
+                ("Reset", self.on_reset),
             ]
         ):
-            button = ttk.Button(rail_buttons, text=label, command=command)
+            button = ActionButton(
+                rail_buttons,
+                text=label,
+                command=command,
+                bg=BUTTON_DARK_BG,
+                fg=BUTTON_DARK_FG,
+                active_bg=BUTTON_DARK_ACTIVE_BG,
+                font=("Helvetica", 11, "bold"),
+            )
             button.grid(row=0, column=column, sticky="ew", padx=(0, 4) if column == 0 else (4, 0))
-            if label == "Solve":
-                self.solve_button = button
-            else:
-                self.reset_button = button
 
         playback = tk.Frame(rail, bg="#ebe4d7")
         playback.pack(fill="x", pady=(12, 0))
@@ -272,14 +343,18 @@ class PuzzleApp:
                 ("Next", self.on_next),
             ]
         ):
-            button = ttk.Button(playback, text=label, command=command)
+            button = ActionButton(
+                playback,
+                text=label,
+                command=command,
+                bg=BUTTON_DARK_BG,
+                fg=BUTTON_DARK_FG,
+                active_bg=BUTTON_DARK_ACTIVE_BG,
+                padx=8,
+                pady=8,
+                font=("Helvetica", 10, "bold"),
+            )
             button.grid(row=0, column=column, sticky="ew", padx=4 if column == 1 else (0 if column == 0 else 4, 0))
-            if label == "Prev":
-                self.prev_button = button
-            elif label == "Play":
-                self.play_button = button
-            else:
-                self.next_button = button
 
         rail_footer = tk.Label(
             rail,
@@ -427,11 +502,11 @@ class PuzzleApp:
         self.refresh_view()
 
     def on_algorithm_changed(self, _event=None):
-        self.controller.set_algorithm(self.algorithm_var.get())
+        self.controller.set_algorithm(resolve_algorithm(self.algorithm_var.get()))
         self.refresh_view()
 
     def on_heuristic_changed(self, _event=None):
-        self.controller.set_heuristic(self.heuristic_var.get())
+        self.controller.set_heuristic(resolve_heuristic(self.heuristic_var.get()))
         self.refresh_view()
 
     def on_custom_state(self):
@@ -444,8 +519,8 @@ class PuzzleApp:
         self.refresh_view()
 
     def on_solve(self):
-        self.controller.set_algorithm(self.algorithm_var.get())
-        self.controller.set_heuristic(self.heuristic_var.get())
+        self.controller.set_algorithm(resolve_algorithm(self.algorithm_var.get()))
+        self.controller.set_heuristic(resolve_heuristic(self.heuristic_var.get()))
         result = self.controller.solve()
         self.stop_playback()
         self.refresh_view()
@@ -501,6 +576,28 @@ class PuzzleApp:
 
         self.step_var.set(self.controller.step_label())
         self.move_list.configure(text=self.controller.move_text())
+
+
+def display_algorithm(name: str) -> str:
+    return ALGORITHM_LABELS[name]
+
+
+def display_heuristic(name: str) -> str:
+    return HEURISTIC_LABELS[name]
+
+
+def resolve_algorithm(label: str) -> str:
+    for key, value in ALGORITHM_LABELS.items():
+        if value == label:
+            return key
+    raise KeyError(label)
+
+
+def resolve_heuristic(label: str) -> str:
+    for key, value in HEURISTIC_LABELS.items():
+        if value == label:
+            return key
+    raise KeyError(label)
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -1,8 +1,21 @@
 import subprocess
 import sys
+import tkinter as tk
 import unittest
 
-from npuzzle.app import PuzzleController
+from npuzzle.app import (
+    ActionButton,
+    ALGORITHM_LABELS,
+    BUTTON_DARK_BG,
+    BUTTON_DARK_FG,
+    HEURISTIC_LABELS,
+    PLAYBACK_SPEED_DEFAULT,
+    PuzzleController,
+    display_algorithm,
+    display_heuristic,
+    resolve_algorithm,
+    resolve_heuristic,
+)
 from npuzzle.presets import PRESET_CASES
 
 
@@ -14,7 +27,7 @@ class PuzzleControllerTests(unittest.TestCase):
         self.assertEqual(controller.algorithm, "astar")
         self.assertEqual(controller.heuristic, "linear_conflict")
         self.assertEqual(controller.current_state, PRESET_CASES["medium"])
-        self.assertEqual(controller.run_text(), "astar • linear_conflict")
+        self.assertEqual(controller.run_text(), "A* • Linear Conflict")
 
     def test_controller_solves_easy_case_and_tracks_steps(self):
         controller = PuzzleController()
@@ -80,6 +93,29 @@ class AppSmokeTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0)
         self.assertIn("N-Puzzle visualizer ready", result.stdout)
+
+
+class AppStyleTests(unittest.TestCase):
+    def test_secondary_buttons_use_high_contrast_palette(self):
+        self.assertEqual(BUTTON_DARK_BG, "#30271e")
+        self.assertEqual(BUTTON_DARK_FG, "#f8f4ed")
+
+    def test_action_buttons_use_label_based_rendering(self):
+        self.assertTrue(issubclass(ActionButton, tk.Label))
+
+    def test_playback_speed_default_is_six_hundred(self):
+        self.assertEqual(PLAYBACK_SPEED_DEFAULT, 600)
+
+    def test_display_labels_are_human_readable(self):
+        self.assertEqual(ALGORITHM_LABELS["astar"], "A*")
+        self.assertEqual(ALGORITHM_LABELS["bfs"], "BFS")
+        self.assertEqual(HEURISTIC_LABELS["linear_conflict"], "Linear Conflict")
+        self.assertEqual(display_algorithm("idastar"), "IDA*")
+        self.assertEqual(display_heuristic("manhattan"), "Manhattan")
+
+    def test_selection_helpers_map_labels_back_to_internal_keys(self):
+        self.assertEqual(resolve_algorithm("A*"), "astar")
+        self.assertEqual(resolve_heuristic("Linear Conflict"), "linear_conflict")
 
 
 if __name__ == "__main__":
