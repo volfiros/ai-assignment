@@ -1,16 +1,12 @@
 import argparse
 import sys
+from typing import Optional, Tuple
 
-from .core import format_state, get_neighbors, is_goal, is_solvable, parse_state
+from .core import PuzzleState, format_state, get_neighbors, is_goal, is_solvable, parse_state
 from .presets import PRESET_CASES
-from .search import HEURISTICS, solve_astar, solve_bfs, solve_idastar, solve_iddfs
+from .search import HEURISTICS, SearchResult, solve_astar, solve_bfs, solve_idastar, solve_iddfs
 
-SOLVERS = {
-    "astar": solve_astar,
-    "bfs": solve_bfs,
-    "idastar": solve_idastar,
-    "iddfs": solve_iddfs,
-}
+SOLVER_NAMES = ("astar", "bfs", "idastar", "iddfs")
 HEURISTIC_ALGORITHMS = {"astar", "idastar"}
 DEFAULT_BENCHMARK_HEURISTIC = "linear_conflict"
 
@@ -22,7 +18,7 @@ def build_parser() -> argparse.ArgumentParser:
     solve_parser = subparsers.add_parser("solve")
     solve_parser.add_argument("--state")
     solve_parser.add_argument("--case", choices=sorted(PRESET_CASES))
-    solve_parser.add_argument("--algorithm", choices=sorted(SOLVERS))
+    solve_parser.add_argument("--algorithm", choices=sorted(SOLVER_NAMES))
     solve_parser.add_argument("--heuristic", choices=sorted(HEURISTICS))
 
     subparsers.add_parser("benchmark")
@@ -30,7 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def resolve_state(args: argparse.Namespace):
+def resolve_state(args: argparse.Namespace) -> Tuple[PuzzleState, str]:
     if args.state and args.case:
         raise ValueError("use either --state or --case, not both")
     if args.state:
@@ -40,7 +36,7 @@ def resolve_state(args: argparse.Namespace):
     return PRESET_CASES["easy"], "easy"
 
 
-def render_report(state, source: str) -> str:
+def render_report(state: PuzzleState, source: str) -> str:
     moves = ", ".join(move for move, _ in get_neighbors(state))
     return "\n".join(
         [
@@ -54,7 +50,12 @@ def render_report(state, source: str) -> str:
     )
 
 
-def render_search_report(state, source: str, algorithm: str, heuristic: str = None) -> str:
+def render_search_report(
+    state: PuzzleState,
+    source: str,
+    algorithm: str,
+    heuristic: Optional[str] = None,
+) -> str:
     result = run_solver(state, algorithm, heuristic)
     moves = " ".join(result.moves) if result.moves else "(none)"
     lines = [
@@ -75,10 +76,24 @@ def render_search_report(state, source: str, algorithm: str, heuristic: str = No
     return "\n".join(lines)
 
 
-def run_solver(state, algorithm: str, heuristic: str = None):
-    if algorithm in HEURISTIC_ALGORITHMS:
-        return SOLVERS[algorithm](state, heuristic)
-    return SOLVERS[algorithm](state)
+def run_solver(
+    state: PuzzleState,
+    algorithm: str,
+    heuristic: Optional[str] = None,
+) -> SearchResult:
+    if algorithm == "astar":
+        if heuristic is None:
+            raise ValueError("heuristic is required for astar")
+        return solve_astar(state, heuristic)
+    if algorithm == "idastar":
+        if heuristic is None:
+            raise ValueError("heuristic is required for idastar")
+        return solve_idastar(state, heuristic)
+    if algorithm == "bfs":
+        return solve_bfs(state)
+    if algorithm == "iddfs":
+        return solve_iddfs(state)
+    raise ValueError(f"unsupported algorithm: {algorithm}")
 
 
 def render_benchmark_report() -> str:
