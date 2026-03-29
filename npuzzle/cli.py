@@ -121,9 +121,6 @@ def main(argv=None) -> int:
         print(render_benchmark_report())
         return 0
 
-    if args.command != "solve":
-        parser.error("unsupported command")
-
     try:
         state, source = resolve_state(args)
     except ValueError as exc:

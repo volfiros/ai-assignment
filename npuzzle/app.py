@@ -289,8 +289,7 @@ class PuzzleApp:
         heuristic_box.bind("<<ComboboxSelected>>", self.on_heuristic_changed)
 
         ttk.Label(rail, text="Custom state", style="Rail.TLabel").pack(anchor="w", pady=(14, 4))
-        custom_entry = ttk.Entry(rail, textvariable=self.custom_state_var, style="App.TEntry")
-        custom_entry.pack(fill="x")
+        ttk.Entry(rail, textvariable=self.custom_state_var, style="App.TEntry").pack(fill="x")
 
         ActionButton(
             rail,
@@ -302,14 +301,13 @@ class PuzzleApp:
         ).pack(fill="x", pady=(8, 0))
 
         ttk.Label(rail, text="Playback speed (ms)", style="Rail.TLabel").pack(anchor="w", pady=(18, 4))
-        speed = ttk.Scale(
+        ttk.Scale(
             rail,
             from_=100,
             to=1200,
             orient="horizontal",
             variable=self.speed_var,
-        )
-        speed.pack(fill="x")
+        ).pack(fill="x")
 
         rail_buttons = tk.Frame(rail, bg="#ebe4d7")
         rail_buttons.pack(fill="x", pady=(18, 0))
