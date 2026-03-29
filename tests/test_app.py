@@ -14,6 +14,7 @@ class PuzzleControllerTests(unittest.TestCase):
         self.assertEqual(controller.algorithm, "astar")
         self.assertEqual(controller.heuristic, "linear_conflict")
         self.assertEqual(controller.current_state, PRESET_CASES["medium"])
+        self.assertEqual(controller.run_text(), "astar • linear_conflict")
 
     def test_controller_solves_easy_case_and_tracks_steps(self):
         controller = PuzzleController()
@@ -57,6 +58,15 @@ class PuzzleControllerTests(unittest.TestCase):
         self.assertFalse(result.solved)
         self.assertEqual(result.nodes_expanded, 0)
         self.assertEqual(controller.step_label(), "Step 1/1")
+
+    def test_move_text_formats_solution_path_for_ui(self):
+        controller = PuzzleController()
+        controller.set_case("easy")
+        controller.solve()
+
+        self.assertEqual(controller.move_text(), "right")
+        controller.reset()
+        self.assertEqual(controller.move_text(), "(none)")
 
 
 class AppSmokeTests(unittest.TestCase):

@@ -77,6 +77,21 @@ class PuzzleController:
     def step_label(self) -> str:
         return f"Step {self.path_index + 1}/{len(self.path)}"
 
+    def move_text(self) -> str:
+        if self.result and self.result.moves:
+            return " ".join(self.result.moves)
+        return "(none)"
+
+    def source_text(self) -> str:
+        if self.selected_case == "custom":
+            return "Custom board"
+        return f"Preset: {self.selected_case}"
+
+    def run_text(self) -> str:
+        if self.algorithm in {"astar", "idastar"}:
+            return f"{self.algorithm} • {self.heuristic}"
+        return self.algorithm
+
     def metrics(self):
         if self.result is None:
             return [
@@ -105,7 +120,22 @@ class PuzzleApp:
         self.play_job = None
 
         self.root.title("N-Puzzle Visualizer")
-        self.root.minsize(720, 520)
+        self.root.geometry("1040x680")
+        self.root.minsize(960, 620)
+        self.root.configure(bg="#f3efe7")
+
+        self.style = ttk.Style()
+        self.style.theme_use("clam")
+        self.style.configure("App.TFrame", background="#f3efe7")
+        self.style.configure("Panel.TFrame", background="#fcfaf6")
+        self.style.configure("Rail.TFrame", background="#ebe4d7")
+        self.style.configure("App.TLabel", background="#fcfaf6", foreground="#201b16")
+        self.style.configure("Rail.TLabel", background="#ebe4d7", foreground="#201b16")
+        self.style.configure("Section.TLabel", background="#ebe4d7", foreground="#201b16", font=("Helvetica", 12, "bold"))
+        self.style.configure("PanelTitle.TLabel", background="#fcfaf6", foreground="#201b16", font=("Helvetica", 14, "bold"))
+        self.style.configure("Meta.TLabel", background="#fcfaf6", foreground="#5a5146", font=("Helvetica", 11))
+        self.style.configure("App.TCombobox", padding=6)
+        self.style.configure("App.TEntry", padding=6)
 
         self.case_var = tk.StringVar(value=self.controller.selected_case)
         self.algorithm_var = tk.StringVar(value=self.controller.algorithm)
@@ -113,6 +143,8 @@ class PuzzleApp:
         self.custom_state_var = tk.StringVar(value="")
         self.speed_var = tk.IntVar(value=350)
         self.step_var = tk.StringVar(value=self.controller.step_label())
+        self.source_var = tk.StringVar(value=self.controller.source_text())
+        self.run_var = tk.StringVar(value=self.controller.run_text())
 
         self.tile_labels = []
         self.metric_values = {}
@@ -121,95 +153,164 @@ class PuzzleApp:
         self.refresh_view()
 
     def _build_layout(self):
-        shell = ttk.Frame(self.root, padding=16)
+        shell = ttk.Frame(self.root, style="App.TFrame", padding=18)
         shell.pack(fill="both", expand=True)
 
-        shell.columnconfigure(0, weight=1)
-        shell.columnconfigure(1, weight=1)
-        shell.rowconfigure(0, weight=1)
+        rail = ttk.Frame(shell, style="Rail.TFrame", width=252, padding=18)
+        rail.pack(side="left", fill="y")
+        rail.pack_propagate(False)
 
-        left = ttk.Frame(shell)
-        left.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
+        workspace = ttk.Frame(shell, style="App.TFrame")
+        workspace.pack(side="left", fill="both", expand=True, padx=(16, 0))
 
-        right = ttk.Frame(shell)
-        right.grid(row=0, column=1, sticky="nsew")
+        topbar = tk.Frame(workspace, bg="#fcfaf6", bd=1, relief="solid", highlightthickness=0)
+        topbar.pack(fill="x")
 
-        controls = ttk.LabelFrame(left, text="Controls", padding=12)
-        controls.pack(fill="x")
+        topbar_left = tk.Frame(topbar, bg="#fcfaf6")
+        topbar_left.pack(side="left", padx=18, pady=14)
+        tk.Label(
+            topbar_left,
+            text="N-Puzzle Solver",
+            bg="#fcfaf6",
+            fg="#201b16",
+            font=("Helvetica", 18, "bold"),
+        ).pack(anchor="w")
+        ttk.Label(topbar_left, textvariable=self.source_var, style="Meta.TLabel").pack(anchor="w", pady=(4, 0))
 
-        ttk.Label(controls, text="Preset case").grid(row=0, column=0, sticky="w")
+        topbar_right = tk.Frame(topbar, bg="#fcfaf6")
+        topbar_right.pack(side="right", padx=18, pady=14)
+        ttk.Label(topbar_right, textvariable=self.run_var, style="Meta.TLabel").pack(anchor="e")
+        ttk.Label(topbar_right, textvariable=self.step_var, style="Meta.TLabel").pack(anchor="e", pady=(4, 0))
+
+        body = ttk.Frame(workspace, style="App.TFrame")
+        body.pack(fill="both", expand=True, pady=(16, 0))
+        body.columnconfigure(0, weight=3)
+        body.columnconfigure(1, weight=2)
+        body.rowconfigure(0, weight=1)
+
+        board_panel = tk.Frame(body, bg="#fcfaf6", bd=1, relief="solid", highlightthickness=0)
+        board_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
+
+        detail_panel = tk.Frame(body, bg="#fcfaf6", bd=1, relief="solid", highlightthickness=0)
+        detail_panel.grid(row=0, column=1, sticky="nsew")
+
+        ttk.Label(rail, text="Controls", style="Section.TLabel").pack(anchor="w")
+        ttk.Label(rail, text="Preset case", style="Rail.TLabel").pack(anchor="w", pady=(18, 4))
         case_box = ttk.Combobox(
-            controls,
+            rail,
             textvariable=self.case_var,
             values=sorted(PRESET_CASES),
             state="readonly",
+            style="App.TCombobox",
         )
-        case_box.grid(row=1, column=0, sticky="ew", pady=(4, 10))
+        case_box.pack(fill="x")
         case_box.bind("<<ComboboxSelected>>", self.on_case_changed)
 
-        ttk.Label(controls, text="Algorithm").grid(row=2, column=0, sticky="w")
+        ttk.Label(rail, text="Algorithm", style="Rail.TLabel").pack(anchor="w", pady=(14, 4))
         algorithm_box = ttk.Combobox(
-            controls,
+            rail,
             textvariable=self.algorithm_var,
             values=["astar", "idastar", "bfs", "iddfs"],
             state="readonly",
+            style="App.TCombobox",
         )
-        algorithm_box.grid(row=3, column=0, sticky="ew", pady=(4, 10))
+        algorithm_box.pack(fill="x")
         algorithm_box.bind("<<ComboboxSelected>>", self.on_algorithm_changed)
 
-        ttk.Label(controls, text="Heuristic").grid(row=4, column=0, sticky="w")
+        ttk.Label(rail, text="Heuristic", style="Rail.TLabel").pack(anchor="w", pady=(14, 4))
         heuristic_box = ttk.Combobox(
-            controls,
+            rail,
             textvariable=self.heuristic_var,
             values=["linear_conflict", "manhattan"],
             state="readonly",
+            style="App.TCombobox",
         )
-        heuristic_box.grid(row=5, column=0, sticky="ew", pady=(4, 10))
+        heuristic_box.pack(fill="x")
         heuristic_box.bind("<<ComboboxSelected>>", self.on_heuristic_changed)
 
-        ttk.Label(controls, text="Custom state").grid(row=6, column=0, sticky="w")
-        custom_entry = ttk.Entry(controls, textvariable=self.custom_state_var)
-        custom_entry.grid(row=7, column=0, sticky="ew", pady=(4, 6))
+        ttk.Label(rail, text="Custom state", style="Rail.TLabel").pack(anchor="w", pady=(14, 4))
+        custom_entry = ttk.Entry(rail, textvariable=self.custom_state_var, style="App.TEntry")
+        custom_entry.pack(fill="x")
 
-        ttk.Button(controls, text="Load custom", command=self.on_custom_state).grid(
-            row=8,
-            column=0,
-            sticky="ew",
-            pady=(0, 10),
-        )
+        ttk.Button(rail, text="Load custom", command=self.on_custom_state).pack(fill="x", pady=(8, 0))
 
-        ttk.Label(controls, text="Playback speed (ms)").grid(row=9, column=0, sticky="w")
+        ttk.Label(rail, text="Playback speed (ms)", style="Rail.TLabel").pack(anchor="w", pady=(18, 4))
         speed = ttk.Scale(
-            controls,
+            rail,
             from_=100,
             to=1200,
             orient="horizontal",
             variable=self.speed_var,
         )
-        speed.grid(row=10, column=0, sticky="ew", pady=(4, 10))
+        speed.pack(fill="x")
 
-        actions = ttk.Frame(controls)
-        actions.grid(row=11, column=0, sticky="ew")
-        actions.columnconfigure((0, 1), weight=1)
+        rail_buttons = tk.Frame(rail, bg="#ebe4d7")
+        rail_buttons.pack(fill="x", pady=(18, 0))
+        rail_buttons.columnconfigure((0, 1), weight=1)
 
-        ttk.Button(actions, text="Solve", command=self.on_solve).grid(row=0, column=0, sticky="ew", padx=(0, 4))
-        ttk.Button(actions, text="Reset", command=self.on_reset).grid(row=0, column=1, sticky="ew", padx=(4, 0))
+        for column, (label, command, dark) in enumerate(
+            [
+                ("Solve", self.on_solve, True),
+                ("Reset", self.on_reset, True),
+            ]
+        ):
+            button = ttk.Button(rail_buttons, text=label, command=command)
+            button.grid(row=0, column=column, sticky="ew", padx=(0, 4) if column == 0 else (4, 0))
+            if label == "Solve":
+                self.solve_button = button
+            else:
+                self.reset_button = button
 
-        playback = ttk.Frame(controls)
-        playback.grid(row=12, column=0, sticky="ew", pady=(10, 0))
+        playback = tk.Frame(rail, bg="#ebe4d7")
+        playback.pack(fill="x", pady=(12, 0))
         playback.columnconfigure((0, 1, 2), weight=1)
 
-        ttk.Button(playback, text="Prev", command=self.on_prev).grid(row=0, column=0, sticky="ew", padx=(0, 4))
-        ttk.Button(playback, text="Play", command=self.on_play).grid(row=0, column=1, sticky="ew", padx=4)
-        ttk.Button(playback, text="Next", command=self.on_next).grid(row=0, column=2, sticky="ew", padx=(4, 0))
+        for column, (label, command) in enumerate(
+            [
+                ("Prev", self.on_prev),
+                ("Play", self.on_play),
+                ("Next", self.on_next),
+            ]
+        ):
+            button = ttk.Button(playback, text=label, command=command)
+            button.grid(row=0, column=column, sticky="ew", padx=4 if column == 1 else (0 if column == 0 else 4, 0))
+            if label == "Prev":
+                self.prev_button = button
+            elif label == "Play":
+                self.play_button = button
+            else:
+                self.next_button = button
 
-        controls.columnconfigure(0, weight=1)
+        rail_footer = tk.Label(
+            rail,
+            text="Run the solver, then step through the path or play it end to end.",
+            bg="#ebe4d7",
+            fg="#5a5146",
+            justify="left",
+            wraplength=208,
+            font=("Helvetica", 11),
+        )
+        rail_footer.pack(side="bottom", anchor="w")
 
-        board_frame = ttk.LabelFrame(right, text="Board", padding=12)
-        board_frame.pack(fill="both", expand=False)
+        board_header = tk.Frame(board_panel, bg="#fcfaf6")
+        board_header.pack(fill="x", padx=18, pady=(18, 8))
+        tk.Label(
+            board_header,
+            text="Board",
+            bg="#fcfaf6",
+            fg="#201b16",
+            font=("Helvetica", 14, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            board_header,
+            text="Follow the returned path one position at a time.",
+            bg="#fcfaf6",
+            fg="#5a5146",
+            font=("Helvetica", 11),
+        ).pack(anchor="w", pady=(4, 0))
 
-        grid = ttk.Frame(board_frame)
-        grid.pack()
+        grid = tk.Frame(board_panel, bg="#fcfaf6")
+        grid.pack(expand=True, pady=(8, 24))
 
         for row in range(3):
             grid.rowconfigure(row, weight=1)
@@ -220,31 +321,104 @@ class PuzzleApp:
             for col in range(3):
                 tile = tk.Label(
                     grid,
-                    width=4,
+                    width=5,
                     height=2,
-                    font=("Helvetica", 28, "bold"),
-                    relief="ridge",
-                    borderwidth=2,
-                    bg="#f3f4f6",
+                    font=("Helvetica", 30, "bold"),
+                    relief="solid",
+                    borderwidth=1,
+                    bg="#f2eadf",
+                    fg="#201b16",
                 )
-                tile.grid(row=row, column=col, padx=6, pady=6, sticky="nsew")
+                tile.grid(row=row, column=col, padx=7, pady=7, sticky="nsew")
                 label_row.append(tile)
             self.tile_labels.append(label_row)
 
-        ttk.Label(right, textvariable=self.step_var, font=("Helvetica", 12, "bold")).pack(anchor="w", pady=(12, 6))
+        metrics_header = tk.Frame(detail_panel, bg="#fcfaf6")
+        metrics_header.pack(fill="x", padx=18, pady=(18, 8))
+        tk.Label(
+            metrics_header,
+            text="Run details",
+            bg="#fcfaf6",
+            fg="#201b16",
+            font=("Helvetica", 14, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            metrics_header,
+            text="Metrics update after each solve. Playback controls do not rerun search.",
+            bg="#fcfaf6",
+            fg="#5a5146",
+            font=("Helvetica", 11),
+            wraplength=260,
+            justify="left",
+        ).pack(anchor="w", pady=(4, 0))
 
-        metrics = ttk.LabelFrame(right, text="Metrics", padding=12)
-        metrics.pack(fill="x", expand=False)
+        step_banner = tk.Label(
+            detail_panel,
+            textvariable=self.step_var,
+            bg="#e7dece",
+            fg="#201b16",
+            font=("Helvetica", 12, "bold"),
+            padx=12,
+            pady=8,
+            relief="solid",
+            borderwidth=1,
+        )
+        step_banner.pack(fill="x", padx=18, pady=(0, 12))
+
+        metrics = tk.Frame(detail_panel, bg="#fcfaf6")
+        metrics.pack(fill="x", padx=18)
 
         for index, (name, value) in enumerate(self.controller.metrics()):
-            ttk.Label(metrics, text=name).grid(row=index, column=0, sticky="w")
-            value_label = ttk.Label(metrics, text=value)
-            value_label.grid(row=index, column=1, sticky="e", padx=(16, 0))
+            tk.Label(
+                metrics,
+                text=name,
+                bg="#fcfaf6",
+                fg="#5a5146",
+                font=("Helvetica", 11),
+            ).grid(row=index, column=0, sticky="w", pady=4)
+            value_label = tk.Label(
+                metrics,
+                text=value,
+                bg="#fcfaf6",
+                fg="#201b16",
+                font=("Helvetica", 11, "bold"),
+            )
+            value_label.grid(row=index, column=1, sticky="e", padx=(16, 0), pady=4)
             self.metric_values[name] = value_label
+        metrics.columnconfigure(1, weight=1)
 
-        self.move_list = tk.Text(right, height=6, width=32, wrap="word")
-        self.move_list.pack(fill="both", expand=True, pady=(12, 0))
-        self.move_list.configure(state="disabled")
+        moves_panel = tk.Frame(detail_panel, bg="#fcfaf6")
+        moves_panel.pack(fill="both", expand=True, padx=18, pady=(16, 18))
+        tk.Label(
+            moves_panel,
+            text="Move sequence",
+            bg="#fcfaf6",
+            fg="#201b16",
+            font=("Helvetica", 13, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            moves_panel,
+            text="The solver output is shown exactly as returned.",
+            bg="#fcfaf6",
+            fg="#5a5146",
+            font=("Helvetica", 11),
+        ).pack(anchor="w", pady=(4, 10))
+
+        self.move_list = tk.Label(
+            moves_panel,
+            text="(none)",
+            bg="#f2eadf",
+            fg="#201b16",
+            justify="left",
+            anchor="nw",
+            padx=12,
+            pady=12,
+            wraplength=260,
+            relief="solid",
+            borderwidth=1,
+            font=("Helvetica", 12),
+        )
+        self.move_list.pack(fill="both", expand=True)
 
     def on_case_changed(self, _event=None):
         self.controller.set_case(self.case_var.get())
@@ -311,27 +485,22 @@ class PuzzleApp:
             self.play_job = None
 
     def refresh_view(self):
+        self.source_var.set(self.controller.source_text())
+        self.run_var.set(self.controller.run_text())
         rows = self.controller.board_rows()
         for row_index, row in enumerate(rows):
             for col_index, value in enumerate(row):
                 tile = self.tile_labels[row_index][col_index]
                 if value == "0":
-                    tile.configure(text="", bg="#d1d5db")
+                    tile.configure(text="", bg="#d2c8b8")
                 else:
-                    tile.configure(text=value, bg="#f3f4f6")
-
-        self.step_var.set(self.controller.step_label())
+                    tile.configure(text=value, bg="#f2eadf")
 
         for name, value in self.controller.metrics():
             self.metric_values[name].configure(text=value)
 
-        moves = "(none)"
-        if self.controller.result and self.controller.result.moves:
-            moves = " ".join(self.controller.result.moves)
-        self.move_list.configure(state="normal")
-        self.move_list.delete("1.0", "end")
-        self.move_list.insert("1.0", f"Moves: {moves}")
-        self.move_list.configure(state="disabled")
+        self.step_var.set(self.controller.step_label())
+        self.move_list.configure(text=self.controller.move_text())
 
 
 def build_parser() -> argparse.ArgumentParser:
